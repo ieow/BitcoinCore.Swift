@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "BitcoinCore",
     platforms: [
-        .iOS(.v13),
+        .iOS(.v15),
     ],
     products: [
         .library(
@@ -25,6 +25,7 @@ let package = Package(
         .package(url: "https://github.com/horizontalsystems/HsCryptoKit.Swift.git", .upToNextMajor(from: "1.2.1")),
         .package(url: "https://github.com/horizontalsystems/HsExtensions.Swift.git", .upToNextMajor(from: "1.0.6")),
         .package(url: "https://github.com/horizontalsystems/HsToolKit.Swift.git", .upToNextMajor(from: "2.0.0")),
+        .package(path: "/Users/apollo/works/crypto/torus/clone26/mpc-kit/mpc-kit-swift")
     ],
     targets: [
         .target(
@@ -37,6 +38,7 @@ let package = Package(
                 .product(name: "HsCryptoKit", package: "HsCryptoKit.Swift"),
                 .product(name: "HsExtensions", package: "HsExtensions.Swift"),
                 .product(name: "HsToolKit", package: "HsToolKit.Swift"),
+                .product(name: "mpc-kit-swift", package: "mpc-kit-swift")
             ]
         ),
         .testTarget(
