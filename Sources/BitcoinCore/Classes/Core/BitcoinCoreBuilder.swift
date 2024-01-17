@@ -1,6 +1,10 @@
 import Foundation
 import HdWalletKit
 import HsToolKit
+import HsCryptoKit
+
+import GRDB
+
 
 public class BitcoinCoreBuilder {
     public enum BuildError: Error { case peerSizeLessThanRequired, noSeedData, noPurpose, noWalletId, noNetwork, noPaymentAddressParser, noAddressSelector, noStorage, noApiProvider, notSupported, noApiSyncStateManager, noCheckpoint }
@@ -11,6 +15,8 @@ public class BitcoinCoreBuilder {
     // required parameters
     private var extendedKey: HDExtendedKey?
     private var watchAddressPublicKey: WatchAddressPublicKey?
+    private var apiSigner: ISigner?
+    
     private var purpose: Purpose?
     private var network: INetwork?
     private var paymentAddressParser: IPaymentAddressParser?
@@ -40,6 +46,11 @@ public class BitcoinCoreBuilder {
 
     public func set(watchAddressPublicKey: WatchAddressPublicKey?) -> BitcoinCoreBuilder {
         self.watchAddressPublicKey = watchAddressPublicKey
+        return self
+    }
+
+    public func set(apiSigner: ISigner?) -> BitcoinCoreBuilder {
+        self.apiSigner = apiSigner
         return self
     }
 
@@ -173,6 +184,28 @@ public class BitcoinCoreBuilder {
             publicKeyManager = manager
             publicKeyFetcher = manager
             blockHashScanHelper = WatchAddressBlockHashScanHelper()
+        } else if let apiSigner {
+            
+            let raw = apiSigner.publicKey
+            let hashP2pkh = Crypto.ripeMd160Sha256(raw)
+            let hashP2wpkhWrappedInP2sh = Crypto.ripeMd160Sha256(OpCode.segWitOutputScript(hashP2pkh, versionByte: 0))
+            let convertedForP2tr = try SchnorrHelper.tweakedOutputKey(publicKey: raw)
+            let row : Row = [
+                "path": "",
+                "account": 0,
+                "index": 0,
+                "external": true,
+                "raw": raw,
+                "hashP2pkh": hashP2pkh,
+                "hashP2wpkhWrappedInP2sh": hashP2wpkhWrappedInP2sh,
+                "convertedForP2tr": convertedForP2tr
+            ]
+
+            let manager = WatchAddressPublicKeyManager(storage: storage, publicKey: try WatchAddressPublicKey(row: row), restoreKeyConverter: restoreKeyConverterChain)
+            publicKeyManager = manager
+            publicKeyFetcher = manager
+            blockHashScanHelper = WatchAddressBlockHashScanHelper()
+    
         } else if let extendedKey {
             switch extendedKey {
             case let .private(privateKey):
@@ -319,6 +352,33 @@ public class BitcoinCoreBuilder {
 
             transactionCreator = TransactionCreator(transactionBuilder: transactionBuilder, transactionProcessor: pendingTransactionProcessor, transactionSender: transactionSenderInstance, bloomFilterManager: bloomFilterManager)
         }
+            
+        if let apiSigner {
+            let ecdsaInputSigner = MPCEcdsaInputSigner(signer: apiSigner, network: network )
+            let schnorrInputSigner = MPCSchnorrInputSigner(signer: apiSigner)
+            let transactionSizeCalculatorInstance = TransactionSizeCalculator()
+            let dustCalculatorInstance = DustCalculator(dustRelayTxFee: network.dustRelayTxFee, sizeCalculator: transactionSizeCalculatorInstance)
+            let recipientSetter = RecipientSetter(addressConverter: addressConverter, pluginManager: pluginManager)
+            let outputSetter = OutputSetter(outputSorterFactory: transactionDataSorterFactory, factory: factory)
+            let inputSetter = InputSetter(unspentOutputSelector: unspentOutputSelector, transactionSizeCalculator: transactionSizeCalculatorInstance, addressConverter: addressConverter, publicKeyManager: publicKeyManager, factory: factory, pluginManager: pluginManager, dustCalculator: dustCalculatorInstance, changeScriptType: purpose.scriptType, inputSorterFactory: transactionDataSorterFactory)
+            let lockTimeSetter = LockTimeSetter(storage: storage)
+            let transactionSigner = TransactionSigner(ecdsaInputSigner: ecdsaInputSigner, schnorrInputSigner: schnorrInputSigner)
+            let transactionBuilder = TransactionBuilder(recipientSetter: recipientSetter, inputSetter: inputSetter, lockTimeSetter: lockTimeSetter, outputSetter: outputSetter, signer: transactionSigner)
+            transactionFeeCalculator = TransactionFeeCalculator(recipientSetter: recipientSetter, inputSetter: inputSetter, addressConverter: addressConverter, publicKeyManager: publicKeyManager, changeScriptType: purpose.scriptType)
+            let transactionSendTimer = TransactionSendTimer(interval: 60)
+            let transactionSenderInstance = TransactionSender(transactionSyncer: pendingTransactionSyncer, initialBlockDownload: initialDownload, peerManager: peerManager, storage: storage, timer: transactionSendTimer, logger: logger)
+
+            dustCalculator = dustCalculatorInstance
+            transactionSizeCalculator = transactionSizeCalculatorInstance
+            transactionSender = transactionSenderInstance
+
+            transactionSendTimer.delegate = transactionSender
+
+            transactionCreator = TransactionCreator(transactionBuilder: transactionBuilder, transactionProcessor: pendingTransactionProcessor, transactionSender: transactionSenderInstance, bloomFilterManager: bloomFilterManager)
+        }
+        
+        
+        
         let mempoolTransactions = MempoolTransactions(transactionSyncer: pendingTransactionSyncer, transactionSender: transactionSender)
 
         let bitcoinCore = BitcoinCore(storage: storage,
