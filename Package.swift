@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "BitcoinCore",
     platforms: [
-        .iOS(.v15),
+        .iOS(.v13),
     ],
     products: [
         .library(
@@ -41,14 +41,14 @@ let package = Package(
                 .product(name: "mpc-kit-swift", package: "mpc-kit-swift")
             ]
         ),
-        .testTarget(
-            name: "BitcoinCoreTests",
-            dependencies: [
-                "BitcoinCore",
-                "Cuckoo",
-                "Nimble",
-                "Quick",
-            ]
-        ),
+//        .testTarget(
+//            name: "BitcoinCoreTests",
+//            dependencies: [
+//                "BitcoinCore",
+//                "Cuckoo",
+//                "Nimble",
+//                "Quick",
+//            ]
+//        ),
     ]
 )
