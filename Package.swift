@@ -25,7 +25,7 @@ let package = Package(
         .package(url: "https://github.com/horizontalsystems/HsCryptoKit.Swift.git", .upToNextMajor(from: "1.2.1")),
         .package(url: "https://github.com/horizontalsystems/HsExtensions.Swift.git", .upToNextMajor(from: "1.0.6")),
         .package(url: "https://github.com/horizontalsystems/HsToolKit.Swift.git", .upToNextMajor(from: "2.0.0")),
-        .package(path: "/Users/apollo/works/crypto/torus/clone26/mpc-kit/mpc-kit-swift")
+        .package(url:"https://github.com/tkey/mpc-kit-swift" ,branch: "main")
     ],
     targets: [
         .target(
