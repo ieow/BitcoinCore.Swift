@@ -15,8 +15,11 @@ class WatchAddressPublicKeyManager: IPublicKeyFetcher, IPublicKeyManager, IBloom
         }
     }
 
-    func publicKeys(indices _: Range<UInt32>, external _: Bool) throws -> [PublicKey] {
-        [publicKey]
+    func publicKeys(indices : Range<UInt32>, external _: Bool) throws -> [PublicKey] {
+        if ( indices.lowerBound > 0 ) {
+            return []
+        }
+        return [publicKey]
     }
 
     func changePublicKey() throws -> PublicKey {
